@@ -1,0 +1,39 @@
+From b7c230c5ab9009d6d9612294dbb1084f2070610b Mon Sep 17 00:00:00 2001
+From: Weijie Gao <weijie.gao@mediatek.com>
+Date: Tue, 2 Feb 2021 10:51:25 +0800
+Subject: armv8: do not read ESR_EL3 in AArch32 state
+
+Currently reading ESR_EL3 in AArch32 state is not supported, and an error
+will br returned directly by armv8_read_reg32(). This error will cause
+the armv8_dpm_read_current_registers() to fail immediately.
+
+Everytime a core is halted in AArch32 state, openocd will behave
+abnormally with error "Failed to read ESR_EL3 register". For example the
+current core state, mode, PC, CPSR, cache and MMU state will not be shown.
+
+By just skipping reading ESR_EL3 in AArch32 state, this issue can be
+easily fixed with no side effect.
+
+Signed-off-by: Weijie Gao <weijie.gao@mediatek.com>
+---
+ src/target/armv8_dpm.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/target/armv8_dpm.c b/src/target/armv8_dpm.c
+index 1e88a445f..702018dc0 100644
+--- a/src/target/armv8_dpm.c
++++ b/src/target/armv8_dpm.c
+@@ -802,6 +802,10 @@ int armv8_dpm_read_current_registers(struct arm_dpm *dpm)
+ 		if (r->number == ARMV8_SPSR_EL1 && arm->core_mode == ARM_MODE_SYS)
+ 			continue;
+ 
++		/* Skip reading ESR_EL3 in AArch32 state */
++		if (r->number == ARMV8_ESR_EL3 && (arm->core_state != ARM_STATE_AARCH64))
++			continue;
++
+ 		retval = dpmv8_read_reg(dpm, r, i);
+ 		if (retval != ERROR_OK)
+ 			goto fail;
+-- 
+2.17.1
+
