@@ -2,7 +2,7 @@
 # Memory controller helpers
 #
 
-source [find target/mediatek/mmio.tcl]
+source [find mmio.tcl]
 
 proc ddr_init {cfgs dq_dly dqs_dly} {
     mmio_clrbits_32 0xb0000304 0x20000000
