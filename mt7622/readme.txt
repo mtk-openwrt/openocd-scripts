@@ -53,6 +53,10 @@ Step to load u-boot via JTAG
 	> halt
 	> load_image fip-snand-no-bmt.bin 0x40020000 bin
 
+   If the MT7622 board is using SPI-NAND flash, use fip-snand-no-bmt.bin.
+   If the MT7622 board is using SPI-NOR flash, use fip-snor.bin.
+   Both fip-snand and fip-snor supports SD/eMMC.
+
 9. Continue to run BL2 and FIP
 	> mww 0x100200 1
 	> resume
