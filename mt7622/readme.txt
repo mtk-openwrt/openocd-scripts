@@ -9,12 +9,16 @@ Step to load u-boot via JTAG
 	> mww 0x10212000 0x22000000
 	> mt7622.cpu0 configure -work-area-phys 0x101000 -work-area-size 8096
 
-   Since MMU can't be disabled in OpenOCD, please make sure the MMU is disabled shown in output, otherwise the following operations may fail
+3. Disable MMU
+	> set cp [aarch64 mrc 15 0 1 0 0]
+	> set cp [expr ($cp & ~1)]
+	> aarch64 mcr 15 0 1 0 0 $cp
 
-   If the output shows the CPU is in AArch64 state, goto step 7
-   If the output shows the CPU is in ARM state, goto step 6
-   If the output shows the CPU is in Thumb state, goto step 5
-   If no output for CPU state, but an error "Error: Failed to read ESR_EL3 register", continue
+   From the output of halt command:
+     If the output shows the CPU is in AArch64 state, goto step 7
+     If the output shows the CPU is in ARM state, goto step 6
+     If the output shows the CPU is in Thumb state, goto step 5
+     If no output for CPU state, but an error "Error: Failed to read ESR_EL3 register", continue
 
 4. Read the CPSR register
 	> reg cpsr

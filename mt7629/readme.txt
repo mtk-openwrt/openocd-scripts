@@ -9,36 +9,40 @@ Step to load u-boot via JTAG
 	> mww 0x10212000 0x22000000
 	> mt7629.cpu0 configure -work-area-phys 0x101000 -work-area-size 8096
 
-   Since MMU can't be disabled in OpenOCD, please make sure the MMU is disabled shown in output, otherwise the following operations may fail
+3. Disable MMU
+	> set cp [arm mrc 15 0 1 0 0]
+	> set cp [expr ($cp & ~1)]
+	> arm mcr 15 0 1 0 0 $cp
 
-   If the output shows the CPU is in ARM state, goto step 4
-   If the output shows the CPU is in Thumb state, continue
+   From the output of halt command:
+     If the output shows the CPU is in ARM state, goto step 5
+     If the output shows the CPU is in Thumb state, continue
 
-3. Switch CPU to ARM state
+4. Switch CPU to ARM state
 	> reg cpsr 0x1d3
 
-4. Load and run ram-boot ATF BL2
+5. Load and run ram-boot ATF BL2
 	> load_image bl2.bin 0x201000 bin
 	> reg pc 0x201000
 	> resume
 
    The last output of BL2 should be "[EMI]rank0 size auto detect: <ram size>"
 
-5. Load U-Boot (included in ATF FIP)
+6. Load U-Boot (included in ATF FIP)
 	> halt
 	> load_image fip-snand.bin 0x40020000 bin
 
    If the MT7629 board is using SPI-NAND flash, use fip-snand.bin.
    If the MT7629 board is using SPI-NOR flash, use fip-snor.bin.
 
-6. Continue to run BL2 and FIP
+7. Continue to run BL2 and FIP
 	> mww 0x100200 1
 	> resume
 
-   In step 4, when "[EMI]rank0 size auto detect: <ram size>" has been output,
+   In step 5, when "[EMI]rank0 size auto detect: <ram size>" has been output,
    the BL2 stops running, and is waiting (uint32_t)0x100200 becoming non-zero
 
    So we can then load the FIP into DRAM before BL2 continuing running the FIP
 
-7. All done
+8. All done
    Now the u-boot should be running.
