@@ -1,0 +1,120 @@
+From 6027fcef82c18ae585c3760b994b21cfd7228101 Mon Sep 17 00:00:00 2001
+From: Weijie Gao <Weijie.Gao@mediatek.com>
+Date: Wed, 8 Mar 2023 09:44:09 +0800
+Subject: [PATCH] target/aarch64: fix "reset halt" on target without
+ srst_nogate
+
+The commit "aarch64: add support for \"reset halt\"" (6c0151623) introduced
+the ability to use Reset Catch to make CPU halts on reset immediately.
+
+Although it's useful, it requires that JTAG logic will not be gated by
+pulling nSRST low, which is the option set by srst_nogate.
+
+For targets do not support srst_nogate, this commit breaks the original
+"reset halt" logic used to be working.
+
+This patch fixed the issue by limiting the use of Reset Catch only if
+srst_nogate is set.
+
+Signed-off-by: Weijie Gao <Weijie.Gao@mediatek.com>
+---
+ src/target/aarch64.c | 49 +++++++++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 19 deletions(-)
+
+diff --git a/src/target/aarch64.c b/src/target/aarch64.c
+index 8e90e6400..045aa7e3b 100644
+--- a/src/target/aarch64.c
++++ b/src/target/aarch64.c
+@@ -1940,17 +1940,17 @@ static int aarch64_assert_reset(struct target *target)
+ 					 */
+ 					adapter_assert_reset();
+ 					srst_asserted = true;
+-				}
+ 
+-				/* make sure to clear all sticky errors */
+-				mem_ap_write_atomic_u32(armv8->debug_ap,
++					/* make sure to clear all sticky errors */
++					mem_ap_write_atomic_u32(armv8->debug_ap,
+ 						armv8->debug_base + CPUV8_DBG_DRCR, DRCR_CSE);
+ 
+-				/* set up Reset Catch debug event to halt the CPU after reset */
+-				retval = aarch64_enable_reset_catch(target, true);
+-				if (retval != ERROR_OK)
+-					LOG_WARNING("%s: Error enabling Reset Catch debug event; the CPU will not halt immediately after reset!",
++					/* set up Reset Catch debug event to halt the CPU after reset */
++					retval = aarch64_enable_reset_catch(target, true);
++					if (retval != ERROR_OK)
++						LOG_WARNING("%s: Error enabling Reset Catch debug event; the CPU will not halt immediately after reset!",
+ 							target_name(target));
++				}
+ 			} else {
+ 				LOG_WARNING("%s: Target not examined, will not halt immediately after reset!",
+ 						target_name(target));
+@@ -1980,6 +1980,7 @@ static int aarch64_assert_reset(struct target *target)
+ 
+ static int aarch64_deassert_reset(struct target *target)
+ {
++	enum reset_types reset_config = jtag_get_reset_config();
+ 	int retval;
+ 
+ 	LOG_DEBUG(" ");
+@@ -1990,26 +1991,36 @@ static int aarch64_deassert_reset(struct target *target)
+ 	if (!target_was_examined(target))
+ 		return ERROR_OK;
+ 
+-	retval = aarch64_init_debug_access(target);
+-	if (retval != ERROR_OK)
+-		return retval;
++	if (reset_config & RESET_SRST_NO_GATING) {
++		retval = aarch64_init_debug_access(target);
++		if (retval != ERROR_OK)
++			return retval;
++	}
+ 
+ 	retval = aarch64_poll(target);
+ 	if (retval != ERROR_OK)
+ 		return retval;
+ 
+-	if (target->reset_halt) {
+-		/* clear pending Reset Catch debug event */
+-		retval = aarch64_clear_reset_catch(target);
++	if (!(reset_config & RESET_SRST_NO_GATING)) {
++		retval = aarch64_init_debug_access(target);
+ 		if (retval != ERROR_OK)
+-			LOG_WARNING("%s: Clearing Reset Catch debug event failed",
++			return retval;
++	}
++
++	if (target->reset_halt) {
++		if (reset_config & RESET_SRST_NO_GATING) {
++			/* clear pending Reset Catch debug event */
++			retval = aarch64_clear_reset_catch(target);
++			if (retval != ERROR_OK)
++				LOG_WARNING("%s: Clearing Reset Catch debug event failed",
+ 					target_name(target));
+ 
+-		/* disable Reset Catch debug event */
+-		retval = aarch64_enable_reset_catch(target, false);
+-		if (retval != ERROR_OK)
+-			LOG_WARNING("%s: Disabling Reset Catch debug event failed",
++			/* disable Reset Catch debug event */
++			retval = aarch64_enable_reset_catch(target, false);
++			if (retval != ERROR_OK)
++				LOG_WARNING("%s: Disabling Reset Catch debug event failed",
+ 					target_name(target));
++		}
+ 
+ 		if (target->state != TARGET_HALTED) {
+ 			LOG_WARNING("%s: ran after reset and before halt ...",
+@@ -2687,7 +2698,7 @@ static int aarch64_examine(struct target *target)
+ 
+ 	/* Configure core debug access */
+ 	if (retval == ERROR_OK)
+-		retval = aarch64_init_debug_access(target);
++		aarch64_init_debug_access(target);
+ 
+ 	return retval;
+ }
+-- 
+2.37.3
+

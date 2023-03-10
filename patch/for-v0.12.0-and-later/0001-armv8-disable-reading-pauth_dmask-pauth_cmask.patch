@@ -1,0 +1,32 @@
+From 70487f86640be9f09b1800ae26b9518853954f0e Mon Sep 17 00:00:00 2001
+From: Weijie Gao <Weijie.Gao@mediatek.com>
+Date: Wed, 8 Mar 2023 10:16:52 +0800
+Subject: [PATCH] armv8: disable reading pauth_dmask/pauth_cmask
+
+The commit "armv8: Add support of pointer authentication"
+(d0436b0cdabb2106701222628d78932c973a1e62) introduced reading
+pauth_dmask/pauth_cmask fails on MediaTek chips.
+
+Just disable them temporarily.
+
+Signed-off-by: Weijie Gao <Weijie.Gao@mediatek.com>
+---
+ src/target/armv8.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/target/armv8.c b/src/target/armv8.c
+index ff71a8e63..193d78df1 100644
+--- a/src/target/armv8.c
++++ b/src/target/armv8.c
+@@ -1448,8 +1448,6 @@ static const struct {
+ 														NULL},
+ 	{ ARMV8_SPSR_EL3, "SPSR_EL3", 32, ARMV8_64_EL3H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+ 														NULL},
+-	{ ARMV8_PAUTH_DMASK, "pauth_dmask", 64, ARM_MODE_ANY, REG_TYPE_UINT64, NULL, "org.gnu.gdb.aarch64.pauth", NULL},
+-	{ ARMV8_PAUTH_CMASK, "pauth_cmask", 64, ARM_MODE_ANY, REG_TYPE_UINT64, NULL, "org.gnu.gdb.aarch64.pauth", NULL},
+ };
+ 
+ static const struct {
+-- 
+2.37.3
+
